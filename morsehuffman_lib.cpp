@@ -1,5 +1,5 @@
 /*
- *  Original code by Daniel Rubio at December 2022
+ *  Original code by Daniel Rubio at Feb 2023
  *
  *  This is free software. You can redistribute it and/or modify.
  *
@@ -7,8 +7,13 @@
  */
 
 #include "morsehuffman_lib.h"
+#include "morsehuffman_hal.h"
+#include "morsehuffman_cfg.h"
 
-/*constants*/
+/*END configurable parameters*/
+
+/*Definitions*/
+#define def_huffman_us_1 def_cfg_huffman_us_0*3
 #define def_val_dot  0x8000u
 #define def_val_dash 0xC000u
 #define def_val_end  0x0000u
@@ -18,14 +23,23 @@
 #define def_space_ascii 32u
 #define def_led_state_off 0u
 #define def_led_state_on 1u
+#define def_offset_digit 48u
+#define def_offset_capitalletter 55u
+#define def_offset_lowercaseletter 87u
 
-/*config*/
-#define buffer_size 16u
-#define numchar_timeout 4u
+/*Prototypes*/
+static void hal_switch_led(unsigned char state);
+static void hal_delayexecution_us(unsigned char us);
+static void hal_setuppin(unsigned char led_id);
 
+static void huffmanprint_func(void);
+static void morsehuffman_pop(unsigned short * value, unsigned char * bits, op_modes mode);
+static unsigned char index_translation(unsigned char par0);
+
+/*Global variable declaration*/
 struct huffmantable
 {
-  unsigned short value;
+  unsigned char value;
   unsigned char bits;
 };
 
@@ -83,47 +97,47 @@ typedef enum
 
 const huffmantable st_huffmantable[enum_symbol_max] = 
 {
-  {0x0006u,4}, //0
-  {0x0005u,4}, //1
-  {0x0003u,4}, //2
-  {0x0002u,4}, //3
-  {0x0001u,4}, //4
-  {0x001Fu,5}, //5
-  {0x001Eu,5}, //6
-  {0x001Du,5}, //7
-  {0x001Bu,5}, //8
-  {0x001Au,5}, //9
-  {0x0016u,5}, //A
-  {0x0070u,7}, //B
-  {0x0029u,6}, //C
-  {0x0009u,5}, //D
-  {0x0019u,5}, //E
-  {0x0011u,6}, //F
-  {0x0030u,6}, //G
-  {0x0012u,5}, //H
-  {0x0013u,5}, //I
-  {0x0141u,9}, //J
-  {0x0051u,7}, //K
-  {0x0001u,5}, //L
-  {0x0020u,6}, //M
-  {0x0011u,5}, //N
-  {0x0015u,5}, //O
-  {0x0071u,7}, //P
-  {0x0020u,7}, //Q
-  {0x000Eu,5}, //R
-  {0x000Fu,5}, //S
-  {0x0017u,5}, //T
-  {0x0000u,5}, //U
-  {0x0021u,7}, //V
-  {0x0031u,6}, //W
-  {0x00A1u,8}, //X
-  {0x0021u,6}, //Y
-  {0x0140u,9}, //Z
-  {0x0039u,6}, //Blank
-  {0xFFFFu,0}  //Invalid
+  {0x70u,4}, //0
+  {0x50u,4}, //1
+  {0x30u,4}, //2
+  {0x20u,4}, //3
+  {0x10u,4}, //4
+  {0xF8u,5}, //5
+  {0xF0u,5}, //6
+  {0xE8u,5}, //7
+  {0xD8u,5}, //8
+  {0xD0u,5}, //9
+  {0xB8u,5}, //A
+  {0x80u,6}, //B
+  {0x48u,5}, //C
+  {0xE4u,6}, //D
+  {0xC8u,5}, //E
+  {0x44u,6}, //F
+  {0x84u,6}, //G
+  {0xB0u,6}, //H
+  {0xA0u,5}, //I
+  {0x41u,8}, //J
+  {0xC0u,7}, //K
+  {0x60u,5}, //L
+  {0xB4u,6}, //M
+  {0x88u,5}, //N
+  {0x98u,5}, //O
+  {0xC4u,6}, //P
+  {0x40u,8}, //Q
+  {0xA8u,5}, //R
+  {0x68u,5}, //S
+  {0x90u,5}, //T
+  {0x08u,5}, //U
+  {0x42u,7}, //V
+  {0xC2u,7}, //W
+  {0xE1u,8}, //X
+  {0xE2u,7}, //Y
+  {0xE0u,8}, //Z
+  {0x00u,5}, //Blank
+  {0xFFu,0}  //Invalid
 };
 
-const unsigned short au16_symbols[enum_symbol_max] =
+const unsigned short au16_symbols_morse[enum_symbol_max] =
 {
     0xDB6Cu,//0
     0xB6D8u,//1
@@ -165,38 +179,27 @@ const unsigned short au16_symbols[enum_symbol_max] =
     def_val_invalid //Invalid
 };
 
-static char morsebuffer[buffer_size] = {0};
-static char huffmanbuffer[buffer_size] = {0};
-static unsigned int morseStrLenVar = 0;
-static unsigned int huffmanStrLenVar = 0;
-static unsigned char outputled = 13u;
+unsigned char morsebuffer[def_cfg_buffer_size] = {0};
+unsigned char huffmanbuffer[def_cfg_buffer_size] = {0};
+unsigned int morseStrLenVar = 0;
+unsigned int huffmanStrLenVar = 0;
 
-static void huffmanprint_func(void);
-static void morsehuffman_pop(unsigned short * value, unsigned char * bits, op_modes mode);
-static void switch_led(unsigned char state);
-static unsigned char index_translation(unsigned char par0);
-
-/*Static interfaces*/
-static void switch_led(unsigned char state)
-{
-  digitalWrite(outputled, state);
-}
-
+/*Local functions*/
 static unsigned char index_translation(unsigned char par0)
 {
     unsigned char index = 0;
     
-    if(par0 >= 48 && par0 <= 57) //0 - 9 ascii range
+    if(par0 >= '0' && par0 <= '9') //0 - 9 ascii range
     {
-        index = par0 - 48u;   
+        index = par0 - def_offset_digit;   
     }
-    else if(par0 >= 65 && par0 <= 90) //A - Z ascii range
+    else if(par0 >= 'A' && par0 <= 'Z') //A - Z ascii range
     {
-        index = par0 - 55u;
+        index = par0 - def_offset_capitalletter;
     }
-    else if(par0 >= 97 && par0 <= 122) //a - z ascii range
+    else if(par0 >= 'a' && par0 <= 'z') //a - z ascii range
     {
-        index = par0 - 87u;
+        index = par0 - def_offset_lowercaseletter;
     }
     else if(def_space_ascii == par0) //space
     {
@@ -212,7 +215,6 @@ static unsigned char index_translation(unsigned char par0)
 
 static void morsehuffman_pop(unsigned short * value, unsigned char * bits, op_modes mode)
 {
-  unsigned int *ptrStrLen;
   unsigned char *ptrBuffer;
   unsigned char index;
 
@@ -235,41 +237,35 @@ static void morsehuffman_pop(unsigned short * value, unsigned char * bits, op_mo
   }
   else
   {
-    *value = au16_symbols[index];
-    *bits = 0;
+		*value = au16_symbols_morse[index];
+		morseStrLenVar--;
   }
-
-  for(index = 0; index < buffer_size-1; index++)
+  
+  for(index = 0; index < def_cfg_buffer_size-1; index++)
   {
-      if(0 != ptrBuffer[index+1])
-      {
-          ptrBuffer[index] = ptrBuffer[index+1];
-      }
-      else
-      {
-          ptrBuffer[index] = 0;
-          break;
-      }        
+	  ptrBuffer[index] = ptrBuffer[index+1];   
   }  
+  ptrBuffer[def_cfg_buffer_size-1] = 0;
 }
 
-/*Public API*/
+/*Public functions*/
 void init_MorseHuffman(unsigned char led_id)
 {
-    outputled = led_id;
-    pinMode(led_id, OUTPUT);
+	hal_setuppin(led_id);
 }
 
 void morsehuffman_fsm(void)
 {
+	
     static char fsm_state = enum_fsm_state_idle;
     static unsigned short chartobeprint;
     static unsigned short duration_counter;
-    
+	
     switch(fsm_state)
     {
         case enum_fsm_state_idle:
         {
+			
             if(morseStrLenVar > 0)
             {
                morsehuffman_pop(&chartobeprint,0,enum_opmode_morse);
@@ -277,11 +273,12 @@ void morsehuffman_fsm(void)
                {
                 fsm_state =  enum_fsm_state_processing;
                }
-               else
-               {
-                morseStrLenVar--;
-               }
             }
+			else
+			{
+				huffmanprint_func();
+			}
+				
         }break;
 
         case enum_fsm_state_processing:
@@ -298,18 +295,17 @@ void morsehuffman_fsm(void)
                     duration_counter = 2;
                     fsm_state = enum_fsm_state_print_dash;
                     huffmanprint_func();
-                    switch_led(def_led_state_on);
+                    hal_switch_led(def_led_state_on);
                 }
                 else if((chartobeprint & def_val_dot) == def_val_dot)
                 {
                     chartobeprint = chartobeprint << 2;
                     fsm_state = enum_fsm_state_print_dot;
                     huffmanprint_func();
-                    switch_led(def_led_state_on);
+                    hal_switch_led(def_led_state_on);
                 }
                 else if(((chartobeprint & def_val_blank) == def_val_blank) || ((chartobeprint & def_val_end) == def_val_end))
                 {
-                  morseStrLenVar--;
                   fsm_state = enum_fsm_state_idle;  
                 }
                 else
@@ -329,14 +325,14 @@ void morsehuffman_fsm(void)
             {
                 fsm_state = enum_fsm_state_processing;
                 huffmanprint_func();
-                switch_led(def_led_state_off);
+                hal_switch_led(def_led_state_off);
             }
         }break;
         case enum_fsm_state_print_dot:
         { 
             fsm_state = enum_fsm_state_processing;
             huffmanprint_func();
-            switch_led(def_led_state_off);
+            hal_switch_led(def_led_state_off);
         }break;
         default:
         {
@@ -350,82 +346,65 @@ static void huffmanprint_func(void)
   unsigned char bits;
   unsigned short huffmancode;
   unsigned char index;
-  unsigned int toPrintAux = 0;
-  unsigned int toPrint = 0;
-  unsigned char totalBits = 0;
+  unsigned char toPrint = 0;
 
   if(0 != huffmanStrLenVar)
   {      
-    while(0 != huffmanStrLenVar)
+    morsehuffman_pop(&huffmancode,&bits,enum_opmode_huffman);
+
+	hal_switch_led(def_led_state_off);
+	
+    for(index = 0; index < bits; index++)
     {
-      if(16u >= (totalBits + 9u))
-      {
-        morsehuffman_pop(&huffmancode,&bits,enum_opmode_huffman);
-        totalBits += bits;
-        toPrintAux = huffmancode << (16u - totalBits);
-        toPrint += toPrintAux;
-      }
-      else
-      {
-        break;
-      }
+		toPrint = (huffmancode >> 8u-(1+index)) & 0x01;
+		hal_switch_led(def_led_state_on);
+		if(1 == toPrint)
+		{
+			hal_delayexecution_us(def_huffman_us_1);
+		}
+		else
+		{
+			hal_delayexecution_us(def_cfg_huffman_us_0);		
+		}
+		hal_switch_led(def_led_state_off);	
     }
-
-      switch_led(def_led_state_off);
-      switch_led(def_led_state_on);
-      switch_led(def_led_state_off);
-      switch_led(def_led_state_on);
-
-      for(index = 0; index < totalBits; index++)
-      {
-        switch_led((toPrint >> 16u-(1+index)) & 0x0001);
-      }
-
-      switch_led(def_led_state_on);
-      switch_led(def_led_state_off);
-      switch_led(def_led_state_on);
-      switch_led(def_led_state_off);
   }
 }
 
 void morsehuffman_msg(char *str, unsigned int lengthval, op_modes mode)
 {
-   unsigned int *ptrStrLen;
-   unsigned char *ptrBuffer;
    unsigned char index;
-   unsigned int actuallength = lengthval + def_offset_space_char;
-
+   
    if(enum_opmode_huffman == mode)
    {
-    ptrStrLen = &huffmanStrLenVar;
-    ptrBuffer = huffmanbuffer;
+		if(str != 0 && lengthval > 0 && (lengthval+huffmanStrLenVar) < def_cfg_buffer_size)
+		{
+			for(index = 0; index < lengthval; index++)
+			{
+				if(index < lengthval)
+				{
+					huffmanbuffer[huffmanStrLenVar+index] = str[index]; 
+				}
+			}
+			huffmanStrLenVar += lengthval;
+		}		
    }
    else
    {
-    ptrStrLen = &morseStrLenVar;
-    ptrBuffer = morsebuffer;
-   }
-   
-   if(str != 0 && lengthval > 0)
-   {    
-        if(*ptrStrLen>0)
-        {
-          ptrBuffer[*ptrStrLen++] = def_space_ascii;
-        }
-        
-        for(index = 0; index < lengthval; index++)
-        {
-            if((*ptrStrLen+index) < buffer_size)
-            {
-                ptrBuffer[*ptrStrLen+index] = str[index]; 
-            }
-            else
-            {
-                *ptrStrLen = buffer_size;
-                ptrBuffer[*ptrStrLen] = def_space_ascii;
-                break;
-            }
-        }
-        *ptrStrLen += lengthval;
+	    if(str != 0 && lengthval > 0 && (lengthval+def_offset_space_char+morseStrLenVar) < def_cfg_buffer_size)
+		{
+			for(index = 0; index < lengthval+def_offset_space_char; index++)
+			{
+				if(index < lengthval)
+				{
+					morsebuffer[morseStrLenVar+index] = str[index]; 
+				}
+				else
+				{
+					morsebuffer[morseStrLenVar+index] = def_space_ascii;
+				}
+			}
+			morseStrLenVar += lengthval+def_offset_space_char;
+		}				
    }
 }

@@ -9,8 +9,6 @@
 #ifndef morsehuffman_lib_h_
 #define morsehuffman_lib_h_
 
-#include "Arduino.h"
-
 typedef enum
 {
     enum_opmode_morse,
