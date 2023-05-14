@@ -11,6 +11,6 @@
 
 /*Configurable parameters*/
 #define def_cfg_buffer_size 16u
-#define def_cfg_huffman_us_0 4u
+#define def_cfg_huffman_us_0 1u
 
 #endif

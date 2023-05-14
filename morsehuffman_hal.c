@@ -13,7 +13,7 @@ char outputled = 13;
 /*Abstraction layer*/
 void hal_switch_led(unsigned char state)
 {
-  digitalWrite(outputled, state);
+  PINB = (PINB | (state << 5));
 }
 
 void hal_delayexecution_us(unsigned char us) 

@@ -14,7 +14,7 @@
 /*END configurable parameters*/
 
 /*Definitions*/
-#define def_huffman_us_1 def_cfg_huffman_us_0*3u
+#define def_huffman_us_1 (def_cfg_huffman_us_0*2u)
 #define def_huffman_us_idle def_cfg_huffman_us_0
 #define def_val_dot  0x8000u
 #define def_val_dash 0xC000u
@@ -107,7 +107,7 @@ static void morsehuffman_pop(unsigned short * value, unsigned char * bits, op_mo
     {0x48u,5}, //A
     {0xE4u,6}, //B
     {0xD8u,5}, //C
-    {0x80u,6}, //D
+    {0xF8u,5}, //D
     {0x60u,5}, //E
     {0xB4u,6}, //F
     {0xB0u,6}, //G
@@ -125,12 +125,12 @@ static void morsehuffman_pop(unsigned short * value, unsigned char * bits, op_mo
     {0xF0u,5}, //S
     {0x98u,5}, //T
     {0xB8u,5}, //U
-    {0xE2u,7}, //V
+    {0x40u,8}, //V
     {0x42u,7}, //W
-    {0x40u,8}, //X
+    {0xE2u,7}, //X
     {0xC0u,7}, //Y
     {0x41u,8}, //Z
-    {0xF8u,5}, //Blank
+    {0x80u,6}, //Blank
     {0xFFu,0}  //Invalid
   };
   const unsigned short au16_symbols_morse[def_symbol_max] =
@@ -331,7 +331,7 @@ void morsehuffman_msg(const char *str, unsigned int lengthval, op_modes mode)
 
    if(enum_opmode_huffman == mode)
    {
-        if((str != (const char *)0u) && (lengthval > 0u) && ((lengthval+huffmanStrLenVar) < def_cfg_buffer_size))
+        if((str != (const char *)0u) && (lengthval > 0u) && ((lengthval+huffmanStrLenVar) <= def_cfg_buffer_size))
         {
             for(index = 0u; index < lengthval; index++)
             {
