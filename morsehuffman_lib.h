@@ -19,6 +19,6 @@ typedef enum_op_modes op_modes;
 
 void init_MorseHuffman(unsigned char led_id);
 void morsehuffman_fsm(void);
-void morsehuffman_msg(const char *str, unsigned int lengthval, op_modes mode);
+void morsehuffman_msg(const char *str, op_modes mode);
 
 #endif

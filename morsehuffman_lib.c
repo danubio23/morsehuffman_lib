@@ -325,13 +325,24 @@ static void huffmanprint_func(void)
   }
 }
 
-void morsehuffman_msg(const char *str, unsigned int lengthval, op_modes mode)
+void morsehuffman_msg(const char *str, op_modes mode)
 {
    unsigned char index;
+   unsigned char lengthval = 0;
+   
+   while(str[lengthval] != 0)
+   {
+	  lengthval++; 
+   }
 
    if(enum_opmode_huffman == mode)
    {
-        if((str != (const char *)0u) && (lengthval > 0u) && ((lengthval+huffmanStrLenVar) <= def_cfg_buffer_size))
+		if((def_cfg_buffer_size - huffmanStrLenVar) < lengthval)
+		{
+			lengthval = def_cfg_buffer_size - huffmanStrLenVar;
+		}
+		
+        if((str != (const char *)0u) && (lengthval > 0u))
         {
             for(index = 0u; index < lengthval; index++)
             {
@@ -342,7 +353,12 @@ void morsehuffman_msg(const char *str, unsigned int lengthval, op_modes mode)
    }
    else
    {
-        if((str != (const char *)0u) && (lengthval > 0u) && ((lengthval+def_offset_space_char+morseStrLenVar) < def_cfg_buffer_size))
+		if((def_cfg_buffer_size - morseStrLenVar - def_offset_space_char ) < lengthval)
+		{
+			lengthval = def_cfg_buffer_size - morseStrLenVar - def_offset_space_char;
+		}
+		
+        if((str != (const char *)0u) && (lengthval > 0u))
         {
             for(index = 0u; index < (lengthval+def_offset_space_char); index++)
             {
