@@ -329,49 +329,43 @@ void morsehuffman_msg(const char *str, op_modes mode)
 {
    unsigned char index;
    unsigned char lengthval = 0;
+   unsigned int *ptr_StrLenVar;
+   char *ptr_buff_string;
    
    while(str[lengthval] != 0)
    {
 	  lengthval++; 
    }
 
-   if(enum_opmode_huffman == mode)
+   if((str != (const char *)0u) && (lengthval > 0u))
    {
-		if((def_cfg_buffer_size - huffmanStrLenVar) < lengthval)
+	    if(enum_opmode_huffman == mode)
+	    {
+		    ptr_buff_string = huffmanbuffer;
+		    ptr_StrLenVar = &huffmanStrLenVar;
+	    }
+	    else
+	    {
+		    ptr_buff_string = morsebuffer;
+		    ptr_StrLenVar = &morseStrLenVar;
+	    }
+		
+		if((def_cfg_buffer_size - *ptr_StrLenVar - def_offset_space_char) < lengthval)
 		{
-			lengthval = def_cfg_buffer_size - huffmanStrLenVar;
+			lengthval = def_cfg_buffer_size - *ptr_StrLenVar - def_offset_space_char;
 		}
 		
-        if((str != (const char *)0u) && (lengthval > 0u))
-        {
-            for(index = 0u; index < lengthval; index++)
-            {
-                huffmanbuffer[huffmanStrLenVar+index] = str[index];
-            }
-            huffmanStrLenVar += lengthval;
-        }
-   }
-   else
-   {
-		if((def_cfg_buffer_size - morseStrLenVar - def_offset_space_char ) < lengthval)
+		for(index = 0u; index < (lengthval+def_offset_space_char); index++)
 		{
-			lengthval = def_cfg_buffer_size - morseStrLenVar - def_offset_space_char;
+			if(index < lengthval)
+			{
+				ptr_buff_string[*ptr_StrLenVar+index] = str[index];
+			}
+			else
+			{
+				ptr_buff_string[*ptr_StrLenVar+index] = (char)def_space_ascii;
+			}	
 		}
-		
-        if((str != (const char *)0u) && (lengthval > 0u))
-        {
-            for(index = 0u; index < (lengthval+def_offset_space_char); index++)
-            {
-                if(index < lengthval)
-                {
-                    morsebuffer[morseStrLenVar+index] = str[index];
-                }
-                else
-                {
-                    morsebuffer[morseStrLenVar+index] = (char)def_space_ascii;
-                }
-            }
-            morseStrLenVar += (unsigned int)(lengthval+def_offset_space_char);
-        }
+		*ptr_StrLenVar += (unsigned int)(lengthval+def_offset_space_char);
    }
 }
